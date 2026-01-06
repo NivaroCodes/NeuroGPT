@@ -1,0 +1,6 @@
+{
+  "git.ignoreLimitWarning": true,
+  "dataworkspace.excludedProjects": [
+    "NeuroGPT/NeuroGPT.sqlproj"
+  ]
+}
