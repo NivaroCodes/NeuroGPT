@@ -1,42 +1,48 @@
+import os
 import asyncio
 import logging
-from aiogram import Bot, Dispatcher, types
+from dotenv import load_dotenv
+from aiogram import Bot, Dispatcher, types, flags
 from aiogram.filters import Command
-from openai import OpenAI
-
-TOKEN = "8595740921:AAEgDvYXXokGgejLwNrUqxc6Nh9baMDC9w0"
+from aiogram.enums import ParseMode
+from aiogram.client.default import DefaultBotProperties
+from aiogram.utils.chat_action import ChatActionMiddleware
+from openai import AsyncOpenAI
 
 logging.basicConfig(level=logging.INFO)
-bot = Bot(token=TOKEN)
+load_dotenv()
+
+token = os.getenv("TOKEN")
+bot = Bot(token=token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp = Dispatcher()
+
+dp.message.middleware(ChatActionMiddleware())
+
+client = AsyncOpenAI(
+    base_url="https://openrouter.ai/api/v1",
+    api_key=os.getenv("OPENAI_API_KEY")
+)
 
 @dp.message(Command("start"))
 async def start_bot(message: types.Message):
-  await message.reply("Привет! Я NeuroGPT, твой личный ассистент по любым вопросам.")
+    await message.answer(
+        "Привет! Я NeuroGPT, твой персональный ассистент"
+    )
 
 @dp.message(lambda message: message.text)
+@flags.chat_action("typing")
 async def create_ai(message: types.Message):
-  client = OpenAI(
-  base_url="https://api.langdock.com/openai/eu/v1",
-  api_key="sk-4q72nZ7wciGNntRS0pPfl2nYnR3S1GNShNmsDa2XpVSoRv1WyAsGvkgYfn9iy3QPMGWDxwHhmo9CGysXIChMNg"
-)
+    completion = await client.chat.completions.create(
+        model=os.getenv("AI_MODEL", "meta-llama/llama-3.3-70b-instruct:free"),
+        messages=[{"role": "user", "content": message.text}]
+    )
 
-  completion = client.chat.completions.create(
-    model="gpt-4o-mini",
-    messages=[
-      {"role": "user", "content": message.text}
-    ]
-)
-  text = completion.choices[0].message.content
-  await message.answer(text)
+    text = completion.choices[0].message.content
+    await message.answer(text)
 
 async def main():
-    print("Бот запущен...")
+    await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)
 
-
-if __name__ == '__main__':
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        print("Бот остановлен")
+if __name__ == "__main__":
+    asyncio.run(main())
